@@ -78,7 +78,7 @@ services:
       # Enable Traefik for this container
       - "traefik.enable=true"
       # Match incoming requests on a specific hostname
-      - "traefik.http.routers.owncloud.rule=Host(`${WNCLOUD_HOSTNAME}`)"
+      - "traefik.http.routers.owncloud.rule=Host(`${OWNCLOUD_HOSTNAME}`)"
       # Assign the router to a named Traefik service
       - "traefik.http.routers.owncloud.service=owncloud"
       # Use the 'websecure' (HTTPS) entry point
