@@ -60,27 +60,37 @@ right place in the ownCloud container.
 First and foremost, you must configure your router or ingress to forward port
 443 (HTTPS) to port 8099 on your NAS.
 
->💡 In case you are already publishing someting on the default HTTPS port 443, you can use any other port, say `1234` but you will have to configure your ownCloud clients to connect to `https://owncloud.mydomain.org:1234` instead of the default `https://owncloud.mydomain.org`.
+>💡 In case you are already publishing someting on the default HTTPS port 443,
+> you can use any other port, say `1234` but you will have to configure your
+> ownCloud clients to connect to `https://owncloud.mydomain.org:1234` instead
+> of the default `https://owncloud.mydomain.org`.
 
 SSH to your NAS, create a folder `owncloud` in your home directory, and bring
 the content of `/qnap` there. The result should look like this:
 
 ![files in my homedir](./ssh-checkout.jpg)
 
->❗ You must edit the file `.env` to configure your ownCloud instance.
+>❗ You must edit the file `.env` to configure your ownCloud instance before
+> installation.
 
 Decide the domain name where your ownCloud will be exposed to the world, and
 change these environment variables:
 
-- **OWNCLOUD_HOSTNAME** is the fully qualified hostname for your ownCloud instance. This must resolve to an IP of your NAS, or more likely your router, which in turn has forwarding rules to your NAS.
+- **OWNCLOUD_HOSTNAME** is the fully qualified hostname for your ownCloud
+instance. This must resolve to an IP of your NAS, or more likely your router,
+which in turn has forwarding rules to your NAS.
 - **OWNCLOUD_ADMIN_USERNAME** is the username for the ownCloud administrator
 - **OWNCLOUD_ADMIN_PASSWORD** is the password of the administrator user
 
 Decide the domain name where the Traefic proxy's dashboard will be exposed to
 the world (if at all), and change these environment variables:
 
-- **TRAEFIK_HOSTNAME** is the fully qualified hostname for your ownCloud instance, usually the same as **OWNCLOUD_HOSTNAME**
-- **TRAEFIK_BASIC_AUTH** is the username and password of the Traefic administratrator, in the form `username:password` where the password is encoded using MD5, SHA1, or BCrypt. You can encode your password [here](https://hostingcanada.org/htpasswd-generator/).
+- **TRAEFIK_HOSTNAME** is the fully qualified hostname for your ownCloud
+instance, usually the same as **OWNCLOUD_HOSTNAME**
+- **TRAEFIK_BASIC_AUTH** is the username and password of the Traefic
+administratrator, in the form `username:password` where the password is encoded
+using MD5, SHA1, or BCrypt. You can encode your password
+[here](https://hostingcanada.org/htpasswd-generator/).
 
 Decide how often you want your ownCloud metadata and the user files backed up,
 and how long to keep the backups:
@@ -106,7 +116,8 @@ folders:
 
 ![my shared folders](./shared-folders.jpg)
 
-From the SSH command line, create a folder `ownCloud` in the root of your volume, then folders `database` and `files` under it:
+From the SSH command line, create a folder `ownCloud` in the root of your volume,
+then creaate folders `database` and `files` under it:
 
 ![ownCloud holder folder](./ssh-owncloud.jpg)
 
@@ -167,14 +178,23 @@ docker compose -p owncloud up -d
 
 The `backups` container is responsible for the following:
 
-1. **Database Backup**: Creates compressed backups of the MariaDB database using `pg_dump`.
-Customizable backup path, filename pattern, and schedule through variables like `MARIADB_BACKUPS_PATH`, `MARIADB_BACKUP_NAME`, and `BACKUP_INTERVAL`.
+1. **Database Backup**: Creates compressed backups of the MariaDB database
+using `pg_dump`. Customizable backup path, filename pattern, and schedule
+through variables like `MARIADB_BACKUPS_PATH`, `MARIADB_BACKUP_NAME`,
+and `BACKUP_INTERVAL`.
 
-2. **Application Data Backup**: Compresses and stores backups of the application data on the same schedule. Controlled via variables such as `DATA_BACKUPS_PATH`, `DATA_BACKUP_NAME`, and `BACKUP_INTERVAL`.
+2. **Application Data Backup**: Compresses and stores backups of the application
+data on the same schedule. Controlled via variables such as `DATA_BACKUPS_PATH`,
+`DATA_BACKUP_NAME`, and `BACKUP_INTERVAL`.
 
-3. **Backup Pruning**: Periodically removes backups exceeding a specified age to manage storage. Customizable pruning schedule and age threshold with `MARIADB_BACKUP_PRUNE_DAYS` and `DATA_BACKUP_PRUNE_DAYS`.
+3. **Backup Pruning**: Periodically removes backups exceeding a specified age to
+manage storage. Customizable pruning schedule and age threshold with
+`MARIADB_BACKUP_PRUNE_DAYS` and `DATA_BACKUP_PRUNE_DAYS`.
 
-By utilizing this container, consistent and automated backups of the essential components of your instance are ensured. Moreover, efficient management of backup storage and tailored backup routines can be achieved through easy and flexible configuration using environment variables.
+By utilizing this container, consistent and automated backups of the essential
+components of your instance are ensured. Moreover, efficient management of
+backup storage and tailored backup routines can be achieved through easy and
+flexible configuration using environment variables.
 
 > The `backups` container is technically a dummy database instance, which is
 > never used. Basing this container on a MariaDB image ensures that the MariaDB
