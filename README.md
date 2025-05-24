@@ -80,7 +80,7 @@ Decide the domain name where the Traefic proxy's dashboard will be exposed to
 the world (if at all), and change these environment variables:
 
 - **TRAEFIK_HOSTNAME** is the fully qualified hostname for your ownCloud instance, usually the same as **OWNCLOUD_HOSTNAME**
-- **TRAEFIK_BASIC_AUTH** is the username and password of the Traefic administratrator, in the form `username:password` where the passwords is encoded using MD5, SHA1, or BCrypt. You can encode your password [here](https://hostingcanada.org/htpasswd-generator/).
+- **TRAEFIK_BASIC_AUTH** is the username and password of the Traefic administratrator, in the form `username:password` where the password is encoded using MD5, SHA1, or BCrypt. You can encode your password [here](https://hostingcanada.org/htpasswd-generator/).
 
 Decide how often you want your ownCloud metadata and the user files backed up,
 and how long to keep the backups:
