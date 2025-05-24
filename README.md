@@ -1,17 +1,73 @@
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/thebe14/owncloud-qnap?color=darkcyan&label=Release)
+![GitHub issues](https://img.shields.io/github/issues/thebe14/owncloud-qnap?label=Issues)
+![GitHub issue custom search in repo](https://img.shields.io/github/issues-search/thebe14/owncloud-qnap?label=Bugs&color=red&query=is%3Aopen%20label%3Abug)
+
 # ownCloud with Let's Encrypt on QNAP NAS
 
-Instead of just declaring volumes that Docker creates in a random place to store
-the various parts of ownCloud's data, we will carefully create folders for them,
-telling Docker to map these into the right place in the ownCloud container.
+[ownCloud](https://owncloud.com/) is the ultimate file management platform,
+essential for enterprise-grade file synchronization and sharing, expertly
+tailored to meet your personal and business needs. Hosting your own instance
+of ownCloud means you will have your own, private ~~Dropbox~~/~~OneDrive~~
+cloud storage.
+
+Most modern NAS models can run applications, either curated by the NAS
+manufacturer or based on Docker containers. However, the ownCloud application
+in the QNAP App Center is either old or was removed in later QTS versions.
+This is a guide on installing ownCloud on a [QNAP NAS](https://www.qnap.com)
+using Docker Compose.
+
+The challenge on hosting your own ownCloud instance is that it only supports
+unencrypted connections. Thus, unless you buy and configure a certificate for
+the hostname on which you expose your ownCloud to the world, and employ a method
+to negotiate and establish and encrypted connection (over the HTTPS protocol),
+all browsers, desktop clients, and mobile apps you use to connect to it will
+complain (rightfully so) that the connection is insecure.
+
+We will use [Traefik](https://github.com/traefik/traefik) as our reverse
+proxy between ownCloud and the world. It will obtain free cryptographic
+certificates from [Let’s Encrypt](https://letsencrypt.org) for your domain
+names, will establish encrypted connections with clients, and will forward
+secure requests to the corresponding services based on those domains.
+
+Let's Encrypt [validates](https://letsencrypt.org/how-it-works/)
+that the hostname for which you are requesting a certificate actually points
+to your service, before it issues a certificate. Multiple
+[validation methods](https://tools.ietf.org/html/rfc8555)
+are supported, the easiest is via an agent that puts a temporary file in a
+well-known path on your website that Let's Encrypt can fech and validate.
+Traefik supports this validation method.
+
+Traefik will be configured to to generate/renew certificates via TLS challenge,
+which means you do not have to open an HTTPS port for your ownCloud instance,
+and another HTTP port for the Let's Encrypt validation, instead both can happen
+via the same HTTPS port.
+
+>💡 If you experiment with this project and re-deploy ownCloud repeatedly,
+> make sure you keep the volume `traefik-certificates`, it contains the
+> certificate issued by Let's Encrypt. If you don't do this, you risk exceeding
+> the [rate limits](https://letsencrypt.org/docs/rate-limits/) of Let's Encrypt,
+> which is 5 certificates every 7 days, as of this commit. This means after you
+> request 5 certificates, you will have to either wait 7 days or change the
+> hostnames you are using for ownCloud and Traefik.
+
+Finally, a comment about using volumes. Instead of just declaring volumes that
+Docker creates in a random place to store the various parts of ownCloud's data,
+we will carefully create folders for them, telling Docker to map these into the
+right place in the ownCloud container.
 
 ## 1. Configuration
+
+First and foremost, you must configure your router or ingress to forward port
+443 (HTTPS) to port 8099 on your NAS.
+
+>💡 In case you are already publishing someting on the default HTTPS port 443, you can use any other port, say `1234` but you will have to configure your ownCloud clients to connect to `https://owncloud.mydomain.org:1234` instead of the default `https://owncloud.mydomain.org`.
 
 SSH to your NAS, create a folder `owncloud` in your home directory, and bring
 the content of `/qnap` there. The result should look like this:
 
 ![files in my homedir](./ssh-checkout.jpg)
 
-❗You must edit the file `.env` to configure your ownCloud instance.
+>❗ You must edit the file `.env` to configure your ownCloud instance.
 
 Decide the domain name where your ownCloud will be exposed to the world and
 change these environment variables:
@@ -78,19 +134,19 @@ you can proceed to install ownCloud.
 Switch to your home directory and make the shell scripts executable, by running
 the following command:
 
-```sh
+```bash
 chmod +x *.sh
 ```
 
 To deploy, use the following script:
 
-```sh
+```bash
 ./deploy.sh
 ```
 
 If you prefer to deploy manually, first create the networks for your services:
 
-```sh
+```bash
 docker network create traefik-network
 docker network create owncloud-network
 ```
@@ -101,7 +157,7 @@ the variables you defined).
 
 You can then deploy ownCloud using Docker Compose:
 
-```sh
+```bash
 docker compose -p owncloud up -d
 ```
 
