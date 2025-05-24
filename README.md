@@ -19,7 +19,7 @@ using Docker Compose.
 The challenge on hosting your own ownCloud instance is that it only supports
 unencrypted connections. Thus, unless you buy and configure a certificate for
 the hostname on which you expose your ownCloud to the world, and employ a method
-to negotiate and establish and encrypted connection (over the HTTPS protocol),
+to negotiate and establish an encrypted connection (over the HTTPS protocol),
 all browsers, desktop clients, and mobile apps you use to connect to it will
 complain (rightfully so) that the connection is insecure.
 
@@ -34,17 +34,17 @@ that the hostname for which you are requesting a certificate actually points
 to your service, before it issues a certificate. Multiple
 [validation methods](https://tools.ietf.org/html/rfc8555)
 are supported, the easiest is via an agent that puts a temporary file in a
-well-known path on your website that Let's Encrypt can fech and validate.
+well-known path on your website that Let's Encrypt can fetch and validate.
 Traefik supports this validation method.
 
-Traefik will be configured to to generate/renew certificates via TLS challenge,
+Traefik will be configured to generate/renew certificates via TLS challenge,
 which means you do not have to open an HTTPS port for your ownCloud instance,
 and another HTTP port for the Let's Encrypt validation, instead both can happen
 via the same HTTPS port.
 
 >💡 If you experiment with this project and re-deploy ownCloud repeatedly,
 > make sure you keep the volume `traefik-certificates`, it contains the
-> certificate issued by Let's Encrypt. If you don't do this, you risk exceeding
+> certificates issued by Let's Encrypt. If you don't do this, you risk exceeding
 > the [rate limits](https://letsencrypt.org/docs/rate-limits/) of Let's Encrypt,
 > which is 5 certificates every 7 days, as of this commit. This means after you
 > request 5 certificates, you will have to either wait 7 days or change the
@@ -69,7 +69,7 @@ the content of `/qnap` there. The result should look like this:
 
 >❗ You must edit the file `.env` to configure your ownCloud instance.
 
-Decide the domain name where your ownCloud will be exposed to the world and
+Decide the domain name where your ownCloud will be exposed to the world, and
 change these environment variables:
 
 - **OWNCLOUD_HOSTNAME** is the fully qualified hostname for your ownCloud instance. This must resolve to an IP of your NAS, or more likely your router, which in turn has forwarding rules to your NAS.
@@ -77,12 +77,12 @@ change these environment variables:
 - **OWNCLOUD_ADMIN_PASSWORD** is the password of the administrator user
 
 Decide the domain name where the Traefic proxy's dashboard will be exposed to
-the world (if at all) and change these environment variables:
+the world (if at all), and change these environment variables:
 
 - **TRAEFIK_HOSTNAME** is the fully qualified hostname for your ownCloud instance, usually the same as **OWNCLOUD_HOSTNAME**
-- **TRAEFIK_BASIC_AUTH** is the username and password of the Traefic administratrator, in the form `username:password` where the passwords is encoded using MD5, SHA1, or BCrypt. You can encode your password [here](https://hostingcanada.org/htpasswd-generator/)
+- **TRAEFIK_BASIC_AUTH** is the username and password of the Traefic administratrator, in the form `username:password` where the passwords is encoded using MD5, SHA1, or BCrypt. You can encode your password [here](https://hostingcanada.org/htpasswd-generator/).
 
-Decide how often you want your ownCloud metadata and the user files backed up
+Decide how often you want your ownCloud metadata and the user files backed up,
 and how long to keep the backups:
 
 - **BACKUP_INTERVAL** is how often you want to backup your ownCloud data
