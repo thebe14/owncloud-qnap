@@ -1,27 +1,29 @@
 #!/bin/sh
 
+source .env
+
 # Ensure we have a folder for the database
-if [ ! -d /share/CACHEDEV1_DATA/ownCloud/database ]; then
+if [ ! -d $NAS_MARIADB_PATH ]; then
     echo "Creating database folder"
-    mkdir -p /share/CACHEDEV1_DATA/ownCloud/database
+    mkdir -p $NAS_MARIADB_PATH
 fi
 
 # Ensure we have a folder for the database backups
-if [ ! -d /share/Backup/ownCloud/database ]; then
+if [ ! -d $NAS_MARIADB_BACKUPS_PATH ]; then
     echo "Creating database backup folder"
-    mkdir -p /share/Backup/ownCloud/database
+    mkdir -p $NAS_MARIADB_BACKUPS_PATH
 fi
 
 # Ensure we have a folder for the user files
-if [ ! -d /share/CACHEDEV1_DATA/ownCloud/files ]; then
+if [ ! -d $NAS_FILES_PATH ]; then
     echo "Creating folder for user files"
-    mkdir -p /share/CACHEDEV1_DATA/ownCloud/files
+    mkdir -p $NAS_FILES_PATH
 fi
 
 # Ensure we have a folder for the user file backups
-if [ ! -d /share/Backup/ownCloud/files ]; then
+if [ ! -d $NAS_FILES_BACKUPS_PATH ]; then
     echo "Creating folder for user file backups"
-    mkdir -p /share/Backup/ownCloud/files
+    mkdir -p $NAS_FILES_BACKUPS_PATH
 fi
 
 docker network create traefik-network
