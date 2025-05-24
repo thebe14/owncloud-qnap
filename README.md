@@ -117,7 +117,7 @@ folders:
 ![my shared folders](./shared-folders.jpg)
 
 From the SSH command line, create a folder `ownCloud` in the root of your volume,
-then creaate folders `database` and `files` under it:
+then create folders `database` and `files` under it:
 
 ![ownCloud holder folder](./ssh-owncloud.jpg)
 
