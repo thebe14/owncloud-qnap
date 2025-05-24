@@ -1,32 +1,117 @@
-# ownCloud with Let's Encrypt Using Docker Compose
+# ownCloud with Let's Encrypt on QNAP NAS
 
-[![Deployment Verification](https://github.com/heyvaldemar/owncloud-traefik-letsencrypt-docker-compose/actions/workflows/00-deployment-verification.yml/badge.svg)](https://github.com/heyvaldemar/owncloud-traefik-letsencrypt-docker-compose/actions)
+Instead of just declaring volumes that Docker creates in a random place to store
+the various parts of ownCloud's data, we will carefully create folders for them,
+telling Docker to map these into the right place in the ownCloud container.
 
-The badge displayed on my repository indicates the status of the deployment verification workflow as executed on the latest commit to the main branch.
+## 1. Configuration
 
-**Passing**: This means the most recent commit has successfully passed all deployment checks, confirming that the Docker Compose setup functions correctly as designed.
+SSH to your NAS, create a folder `owncloud` in your home directory, and bring
+the content of `/qnap` there. The result should look like this:
 
-📙 The complete installation guide is available on my [website](https://www.heyvaldemar.com/install-owncloud-using-docker-compose/).
+![files in my homedir](./ssh-checkout.jpg)
 
-❗ Change variables in the `.env` to meet your requirements.
+❗You must edit the file `.env` to configure your ownCloud instance.
 
-💡 Note that the `.env` file should be in the same directory as `owncloud-traefik-letsencrypt-docker-compose.yml`.
+Decide the domain name where your ownCloud will be exposed to the world and
+change these environment variables:
 
-Create networks for your services before deploying the configuration using the commands:
+- **OWNCLOUD_HOSTNAME** is the fully qualified hostname for your ownCloud instance. This must resolve to an IP of your NAS, or more likely your router, which in turn has forwarding rules to your NAS.
+- **OWNCLOUD_ADMIN_USERNAME** is the username for the ownCloud administrator
+- **OWNCLOUD_ADMIN_PASSWORD** is the password of the administrator user
 
-`docker network create traefik-network`
+Decide the domain name where the Traefic proxy's dashboard will be exposed to
+the world (if at all) and change these environment variables:
 
-`docker network create owncloud-network`
+- **TRAEFIK_HOSTNAME** is the fully qualified hostname for your ownCloud instance, usually the same as **OWNCLOUD_HOSTNAME**
+- **TRAEFIK_BASIC_AUTH** is the username and password of the Traefic administratrator, in the form `username:password` where the passwords is encoded using MD5, SHA1, or BCrypt. You can encode your password [here](https://hostingcanada.org/htpasswd-generator/)
 
-Deploy ownCloud using Docker Compose:
+Decide how often you want your ownCloud metadata and the user files backed up
+and how long to keep the backups:
 
-`docker compose -f owncloud-traefik-letsencrypt-docker-compose.yml -p owncloud up -d`
+- **BACKUP_INTERVAL** is how often you want to backup your ownCloud data
+- **MARIADB_BACKUP_PRUNE_DAYS** is how many days of database backups to keep
+- **DATA_BACKUP_PRUNE_DAYS** is how many days of user file backups to keep
 
-## Backups
+Decide where ownCloud's data should be stored and backed up, and create
+dedicated folders for them.
 
-The `backups` container in the configuration is responsible for the following:
+On a QNAP NAS there is usually one volume, sometimes more. 
+On my NAS the only volume is mounted under `/share/CACHEDEV1_DATA`, you should
+see all the shared folders there:
 
-1. **Database Backup**: Creates compressed backups of the MariaDB database using pg_dump.
+![my shared folders via command line](./ssh-shares.jpg)
+
+There are also symlinks under `/share` to all shared folders, we will take
+advantage of these to define where to backup up data in this ownCloud instance.
+
+You can confirm you are in the right place if these folders match your shared
+folders:
+
+![my shared folders](./shared-folders.jpg)
+
+From the SSH command line, create a folder `ownCloud` in the root of your volume, then folders `database` and `files` under it:
+
+![ownCloud holder folder](./ssh-owncloud.jpg)
+
+>❗ If you create the ownCloud root folder from the Control Panel, that will
+> create a shared folder, allowing access to the user files via that share.
+> This is a bad idea. Never touch the user files directly, it will corrupt your
+> ownCloud installation.
+
+In summary, you will have to create the folders below and change the environment
+variables to point to them:
+
+- **NAS_MARIADB_PATH** is where the ownCloud metadata is kept (in a MariaDB database)
+- **NAS_MARIADB_BACKUPS_PATH** is where the database is backed up periodically (see below)
+- **NAS_FILES_PATH** is where the actual user files are kept
+- **NAS_FILES_BACKUPS_PATH** is where the user files are backed up periodically (see below)
+
+After you created these folders and set the environment variables to point to them,
+you can proceed to install ownCloud.
+
+>💡 I am storing the backups under a shared folder `Backup`, to facilitate syncing
+> the backups off-site.
+
+## 2. Installation
+
+Switch to your home directory and make the shell scripts executable, by running
+the following command:
+
+```sh
+chmod +x *.sh
+```
+
+To deploy, use the following script:
+
+```sh
+./deploy.sh
+```
+
+If you prefer to deploy manually, first create the networks for your services:
+
+```sh
+docker network create traefik-network
+docker network create owncloud-network
+```
+
+Then make sure each folder described in the [configuration](#1-configuration)
+section exists (the script `./deploy.sh` would create these for you, based on
+the variables you defined).
+
+You can then deploy ownCloud using Docker Compose:
+
+```sh
+docker compose -p owncloud up -d
+```
+
+> Note that the `.env` file should be in the same directory as `docker-compose.yml`.
+
+## 3. Backups
+
+The `backups` container is responsible for the following:
+
+1. **Database Backup**: Creates compressed backups of the MariaDB database using `pg_dump`.
 Customizable backup path, filename pattern, and schedule through variables like `MARIADB_BACKUPS_PATH`, `MARIADB_BACKUP_NAME`, and `BACKUP_INTERVAL`.
 
 2. **Application Data Backup**: Compresses and stores backups of the application data on the same schedule. Controlled via variables such as `DATA_BACKUPS_PATH`, `DATA_BACKUP_NAME`, and `BACKUP_INTERVAL`.
@@ -35,126 +120,64 @@ Customizable backup path, filename pattern, and schedule through variables like 
 
 By utilizing this container, consistent and automated backups of the essential components of your instance are ensured. Moreover, efficient management of backup storage and tailored backup routines can be achieved through easy and flexible configuration using environment variables.
 
-## owncloud-restore-database.sh Description
+> The `backups` container is technically a dummy database instance, which is
+> never used. Basing this container on a MariaDB image ensures that the MariaDB
+> utilities to backup and restore the database are available in the container.
+
+To take advantage of the backups this container creates periodically, you can
+run the restore scripts from a SSH session to your QNAP.
+
+### 3.1 Restoring the database
 
 This script facilitates the restoration of a database backup:
 
-1. **Identify Containers**: It first identifies the service and backups containers by name, finding the appropriate container IDs.
+1. **Identify Containers**: It first identifies the service and backups
+containers by name, finding the appropriate container IDs.
 
-2. **List Backups**: Displays all available database backups located at the specified backup path.
+2. **List Backups**: Displays all available database backups located at the
+specified backup path.
 
-3. **Select Backup**: Prompts the user to copy and paste the desired backup name from the list to restore the database.
+3. **Select Backup**: Prompts the user to copy and paste the desired backup
+name from the list to restore the database.
 
-4. **Stop Service**: Temporarily stops the service to ensure data consistency during restoration.
+4. **Stop Service**: Temporarily stops the service to ensure data consistency
+during restoration.
 
-5. **Restore Database**: Executes a sequence of commands to drop the current database, create a new one, and restore it from the selected compressed backup file.
+5. **Restore Database**: Executes a sequence of commands to drop the current
+database, create a new one, and restore it from the selected compressed backup
+file.
 
 6. **Start Service**: Restarts the service after the restoration is completed.
 
-To make the `owncloud-restore-database.shh` script executable, run the following command:
+Usage of this script ensures a controlled and guided process to restore the
+database from an existing backup.
 
-`chmod +x owncloud-restore-database.sh`
-
-Usage of this script ensures a controlled and guided process to restore the database from an existing backup.
-
-## owncloud-restore-application-data.sh Description
+### 3.2 Restoring the application data
 
 This script is designed to restore the application data:
 
-1. **Identify Containers**: Similarly to the database restore script, it identifies the service and backups containers by name.
+1. **Identify Containers**: Similarly to the database restore script, it
+identifies the service and backups containers by name.
 
-2. **List Application Data Backups**: Displays all available application data backups at the specified backup path.
+2. **List Application Data Backups**: Displays all available application data
+backups at the specified backup path.
 
-3. **Select Backup**: Asks the user to copy and paste the desired backup name for application data restoration.
+3. **Select Backup**: Asks the user to copy and paste the desired backup name
+for application data restoration.
 
-4. **Stop Service**: Stops the service to prevent any conflicts during the restore process.
+4. **Stop Service**: Stops the service to prevent any conflicts during the
+restore process.
 
-5. **Restore Application Data**: Removes the current application data and then extracts the selected backup to the appropriate application data path.
+5. **Restore Application Data**: Removes the current application data and
+then extracts the selected backup to the appropriate application data path.
 
-6. **Start Service**: Restarts the service after the application data has been successfully restored.
+6. **Start Service**: Restarts the service after the application data has
+been successfully restored.
 
-To make the `owncloud-restore-application-data.sh` script executable, run the following command:
+By utilizing this script, you can efficiently restore application data from
+an existing backup while ensuring proper coordination with the running service.
 
-`chmod +x owncloud-restore-application-data.sh`
+## Authors
 
-By utilizing this script, you can efficiently restore application data from an existing backup while ensuring proper coordination with the running service.
-
-## Author
-
-hey everyone,
-
-💾 I’ve been in the IT game for over 20 years, cutting my teeth with some big names like [IBM](https://www.linkedin.com/in/heyvaldemar/), [Thales](https://www.linkedin.com/in/heyvaldemar/), and [Amazon](https://www.linkedin.com/in/heyvaldemar/). These days, I wear the hat of a DevOps Consultant and Team Lead, but what really gets me going is Docker and container technology - I’m kind of obsessed!
-
-💛 I have my own IT [blog](https://www.heyvaldemar.com/), where I’ve built a [community](https://discord.gg/AJQGCCBcqf) of DevOps enthusiasts who share my love for all things Docker, containers, and IT technologies in general. And to make sure everyone can jump on this awesome DevOps train, I write super detailed guides (seriously, they’re foolproof!) that help even newbies deploy and manage complex IT solutions.
-
-🚀 My dream is to empower every single person in the DevOps community to squeeze every last drop of potential out of Docker and container tech.
-
-🐳 As a [Docker Captain](https://www.docker.com/captains/vladimir-mikhalev/), I’m stoked to share my knowledge, experiences, and a good dose of passion for the tech. My aim is to encourage learning, innovation, and growth, and to inspire the next generation of IT whizz-kids to push Docker and container tech to its limits.
-
-Let’s do this together!
-
-## My 2D Portfolio
-
-🕹️ Click into [sre.gg](https://www.sre.gg/) — my virtual space is a 2D pixel-art portfolio inviting you to interact with elements that encapsulate the milestones of my DevOps career.
-
-## My Courses
-
-🎓 Dive into my [comprehensive IT courses](https://www.heyvaldemar.com/courses/) designed for enthusiasts and professionals alike. Whether you're looking to master Docker, conquer Kubernetes, or advance your DevOps skills, my courses provide a structured pathway to enhancing your technical prowess.
-
-🔑 [Each course](https://www.udemy.com/user/heyvaldemar/) is built from the ground up with real-world scenarios in mind, ensuring that you gain practical knowledge and hands-on experience. From beginners to seasoned professionals, there's something here for everyone to elevate their IT skills.
-
-## My Services
-
-💼 Take a look at my [service catalog](https://www.heyvaldemar.com/services/) and find out how we can make your technological life better. Whether it's increasing the efficiency of your IT infrastructure, advancing your career, or expanding your technological horizons — I'm here to help you achieve your goals. From DevOps transformations to building gaming computers — let's make your technology unparalleled!
-
-## Patreon Exclusives
-
-🏆 Join my [Patreon](https://www.patreon.com/heyvaldemar) and dive deep into the world of Docker and DevOps with exclusive content tailored for IT enthusiasts and professionals. As your experienced guide, I offer a range of membership tiers designed to suit everyone from newbies to IT experts.
-
-## My Recommendations
-
-📕 Check out my collection of [essential DevOps books](https://kit.co/heyvaldemar/essential-devops-books)\
-🖥️ Check out my [studio streaming and recording kit](https://kit.co/heyvaldemar/my-studio-streaming-and-recording-kit)\
-📡 Check out my [streaming starter kit](https://kit.co/heyvaldemar/streaming-starter-kit)
-
-## Follow Me
-
-🎬 [YouTube](https://www.youtube.com/channel/UCf85kQ0u1sYTTTyKVpxrlyQ?sub_confirmation=1)\
-🐦 [X / Twitter](https://twitter.com/heyvaldemar)\
-🎨 [Instagram](https://www.instagram.com/heyvaldemar/)\
-🐘 [Mastodon](https://mastodon.social/@heyvaldemar)\
-🧵 [Threads](https://www.threads.net/@heyvaldemar)\
-🎸 [Facebook](https://www.facebook.com/heyvaldemarFB/)\
-🧊 [Bluesky](https://bsky.app/profile/heyvaldemar.bsky.social)\
-🎥 [TikTok](https://www.tiktok.com/@heyvaldemar)\
-💻 [LinkedIn](https://www.linkedin.com/in/heyvaldemar/)\
-📣 [daily.dev Squad](https://app.daily.dev/squads/devopscompass)\
-🧩 [LeetCode](https://leetcode.com/u/heyvaldemar/)\
-🐈 [GitHub](https://github.com/heyvaldemar)
-
-## Community of IT Experts
-
-👾 [Discord](https://discord.gg/AJQGCCBcqf)
-
-## Refill My Coffee Supplies
-
-💖 [PayPal](https://www.paypal.com/paypalme/heyvaldemarCOM)\
-🏆 [Patreon](https://www.patreon.com/heyvaldemar)\
-💎 [GitHub](https://github.com/sponsors/heyvaldemar)\
-🥤 [BuyMeaCoffee](https://www.buymeacoffee.com/heyvaldemar)\
-🍪 [Ko-fi](https://ko-fi.com/heyvaldemar)
-
-🌟 **Bitcoin (BTC):** bc1q2fq0k2lvdythdrj4ep20metjwnjuf7wccpckxc\
-🔹 **Ethereum (ETH):** 0x76C936F9366Fad39769CA5285b0Af1d975adacB8\
-🪙 **Binance Coin (BNB):** bnb1xnn6gg63lr2dgufngfr0lkq39kz8qltjt2v2g6\
-💠 **Litecoin (LTC):** LMGrhx8Jsx73h1pWY9FE8GB46nBytjvz8g
-
-<div align="center">
-
-### Show some 💜 by starring some of the [repositories](https://github.com/heyValdemar?tab=repositories)!
-
-![octocat](https://user-images.githubusercontent.com/10498744/210113490-e2fad07f-4488-4da8-a656-b9abbdd8cb26.gif)
-
-</div>
-
-![footer](https://user-images.githubusercontent.com/10498744/210157572-1fca0242-8af2-46a6-bfa3-666ffd40ebde.svg)
+Based on work of [Vladimir Mikhalev](https://www.linkedin.com/in/heyvaldemar/),
+adapted for QNAP NAS running QTS 5.x by [Levente Farkas](https://github.com/thebe14).
