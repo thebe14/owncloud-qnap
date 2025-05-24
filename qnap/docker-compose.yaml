@@ -5,19 +5,15 @@ networks:
     external: true
 
 volumes:
-  owncloud-data:
+  shadow-db:
   redis-data:
-  mariadb-data:
-  owncloud-mariadb-backup:
-  owncloud-data-backups:
-  owncloud-database-backups:
   traefik-certificates:
 
 services:
   mariadb:
     image: ${OWNCLOUD_MARIADB_IMAGE_TAG}
     volumes:
-      - mariadb-data:/var/lib/mysql
+      - ${NAS_MARIADB_PATH}:/var/lib/mysql
     environment:
       MARIADB_DATABASE: ${OWNCLOUD_DB_NAME}
       MARIADB_USER: ${OWNCLOUD_DB_USER}
@@ -51,7 +47,7 @@ services:
   owncloud:
     image: ${OWNCLOUD_IMAGE_TAG}
     volumes:
-      - owncloud-data:${DATA_PATH}
+      - ${NAS_FILES_PATH}:${DATA_PATH}
     environment:
       OWNCLOUD_DOMAIN: ${OWNCLOUD_HOSTNAME}
       OWNCLOUD_TRUSTED_DOMAINS: ${OWNCLOUD_HOSTNAME}
@@ -115,12 +111,12 @@ services:
       - "--api.dashboard=true"
       # Enable the /ping endpoint so we can health-check Traefik
       - "--ping=true"
-      # Assign the /ping endpoint to a dedicated entry point on port 8082
+      # Assign the /ping endpoint to a dedicated entry point on port 8092
       - "--ping.entrypoint=ping"
-      - "--entrypoints.ping.address=:8082"
-      # Define the primary HTTP entry point on port 80
+      - "--entrypoints.ping.address=:8092"
+      # Define the primary HTTP entry point
       - "--entrypoints.web.address=:80"
-      # Define the secure (HTTPS) entry point on port 443
+      # Define the secure (HTTPS) entry point
       - "--entrypoints.websecure.address=:443"
       # HTTP -> HTTPS redirect at entrypoint level
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
@@ -129,11 +125,12 @@ services:
       - "--providers.docker=true"
       # Point Traefik to the Docker socket
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
-      # Prevent automatic exposure of all containers; only expose containers
-      # with "traefik.enable=true"
+      # Prevent automatic exposure of all containers; only expose containers with "traefik.enable=true"
       - "--providers.docker.exposedbydefault=false"
       # Use ACME (Let's Encrypt) to generate/renew certificates via TLS challenge
       - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      # Uncomment to use test certificates issued by "Fake LE Intermediate X1" aka the Let's Encrypt staging environment intermediate CA
+      #- "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
       # The email address used by Let's Encrypt for renewal notices
       - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}"
       # The file where ACME certificates are stored inside the container
@@ -152,10 +149,10 @@ services:
     networks:
       - traefik-network
     ports:
-      - "80:80"
-      - "443:443"
+      - "8098:80"
+      - "8099:443"
     healthcheck:
-      test: ["CMD", "wget", "http://localhost:8082/ping","--spider"]
+      test: ["CMD", "wget", "http://localhost:8092/ping","--spider"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -189,10 +186,10 @@ services:
         find $DATA_BACKUPS_PATH -type f -mtime +$DATA_BACKUP_PRUNE_DAYS | xargs rm -f;
         sleep $BACKUP_INTERVAL; done'
     volumes:
-      - owncloud-mariadb-backup:/var/lib/mysql
-      - owncloud-data:${DATA_PATH}
-      - owncloud-data-backups:${DATA_BACKUPS_PATH}
-      - owncloud-database-backups:${MARIADB_BACKUPS_PATH}
+      - shadow-db:/var/lib/mysql
+      - ${NAS_FILES_PATH}:${DATA_PATH}
+      - ${NAS_FILES_BACKUPS_PATH}:${DATA_BACKUPS_PATH}
+      - ${NAS_MARIADB_BACKUPS_PATH}:${MARIADB_BACKUPS_PATH}
     environment:
       OWNCLOUD_DB_NAME: ${OWNCLOUD_DB_NAME}
       OWNCLOUD_DB_USER: ${OWNCLOUD_DB_USER}
