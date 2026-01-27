@@ -117,7 +117,7 @@ folders:
 ![my shared folders](./shared-folders.jpg)
 
 From the SSH command line, create a folder `ownCloud` in the root of your volume,
-then create folders `database` and `files` under it:
+then create folders `database`, `files`, and `ssl` under it:
 
 ![ownCloud holder folder](./ssh-owncloud.jpg)
 
@@ -133,6 +133,7 @@ variables to point to them:
 - **NAS_MARIADB_BACKUPS_PATH** is where the database is backed up periodically (see below)
 - **NAS_FILES_PATH** is where the actual user files are kept
 - **NAS_FILES_BACKUPS_PATH** is where the user files are backed up periodically (see below)
+- **NAS_CERTS_BACKUPS_PATH** is where the SSL certificate is backed up periodically (see below)
 
 After you created these folders and set the environment variables to point to them,
 you can proceed to install ownCloud.
@@ -152,14 +153,14 @@ chmod +x *.sh
 To deploy, use the following script:
 
 ```bash
-./deploy.sh
+sudo ./deploy.sh
 ```
 
 If you prefer to deploy manually, first create the networks for your services:
 
 ```bash
-docker network create traefik-network
-docker network create owncloud-network
+sudo docker network create traefik-network
+sudo docker network create owncloud-network
 ```
 
 Then make sure each folder described in the [configuration](#1-configuration)
@@ -169,7 +170,7 @@ the variables you defined).
 You can then deploy ownCloud using Docker Compose:
 
 ```bash
-docker compose -p owncloud up -d
+sudo docker compose -p owncloud up -d
 ```
 
 > Note that the `.env` file should be in the same directory as `docker-compose.yml`.
@@ -190,6 +191,10 @@ data on the same schedule. Controlled via variables such as `DATA_BACKUPS_PATH`,
 3. **Backup Pruning**: Periodically removes backups exceeding a specified age to
 manage storage. Customizable pruning schedule and age threshold with
 `MARIADB_BACKUP_PRUNE_DAYS` and `DATA_BACKUP_PRUNE_DAYS`.
+
+4. Exporting the SSL certificate (and key) obtained from Let's Encrypt for the
+configured domain. This is useful if you want to reuse it for other services
+that you expose of the same domain name.
 
 By utilizing this container, consistent and automated backups of the essential
 components of your instance are ensured. Moreover, efficient management of

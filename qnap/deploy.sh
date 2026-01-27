@@ -26,6 +26,12 @@ if [ ! -d $NAS_FILES_BACKUPS_PATH ]; then
     mkdir -p $NAS_FILES_BACKUPS_PATH
 fi
 
+# Ensure we have a folder for the SSL certificate backup
+if [ ! -d $NAS_CERTS_BACKUP_PATH ]; then
+    echo "Creating folder for SSL certificate backup"
+    mkdir -p $NAS_CERTS_BACKUP_PATH
+fi
+
 docker network create traefik-network
 docker network create owncloud-network
 
